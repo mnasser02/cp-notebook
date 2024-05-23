@@ -13,38 +13,55 @@ typedef vector<ll> vll;
 #define rall(x) (x).rbegin(), (x).rend()
 #define LSOne(S) ((S) & -(S))
 
-vi stree;
-int n, q;
-int query(int p, int l, int r, int i, int j) {
-    if (i <= l && r <= j) {
-        return stree[p];
+struct SegTree {
+    vi tree;
+    int n;
+
+    SegTree(int _n) : n(_n) {
+        while (__builtin_popcount(n) != 1) n++;
+        tree.resize(2 * n);
     }
-    if (r < i || l > j) {
-        return 1e9;
+
+    SegTree(const vi &x) {
+        n = x.size();
+        while (__builtin_popcount(n) != 1) n++;
+        tree.resize(2 * n);
+
+        for (int i = 0; i < x.size(); i++) {
+            tree[n + i] = x[i];
+        }
+        for (int i = n - 1; i >= 1; i--) {
+            tree[i] = min(tree[i << 1], tree[i << 1 | 1]);
+        }
     }
-    int m = l + r >> 1;
-    return min(query(p << 1, l, m, i, j), query(p << 1 | 1, m + 1, r, i, j));
-}
-void update(int p, int x) {
-    stree[n + p] = x;
-    for (int j = n + p >> 1; j >= 1; j >>= 1) {
-        stree[j] = min(stree[j << 1], stree[j << 1 | 1]);
+
+    int query(int p, int l, int r, int i, int j) {
+        if (i <= l && r <= j) {
+            return tree[p];
+        }
+        if (r < i || l > j) return 2e9;
+        int m = l + r >> 1;
+        return min(query(p << 1, l, m, i, j), query(p << 1 | 1, m + 1, r, i, j));
     }
-}
+
+    void update(int p, int x) {
+        tree[n + p] = x;
+        for (int j = n + p >> 1; j >= 1; j >>= 1) {
+            tree[j] = min(tree[j << 1], tree[j << 1 | 1]);
+        }
+    }
+
+    int query(int i, int j) { return query(1, 0, n - 1, i, j); }
+};
+
 void solve() {
+    int n, q;
     cin >> n >> q;
     vi x(n);
     for (int i = 0; i < n; i++) {
         cin >> x[i];
     }
-    while (__builtin_popcount(n) != 1) n++;
-    stree.assign(2 * n, 1e9);
-    for (int i = 0; i < x.size(); i++) {
-        stree[n + i] = x[i];
-    }
-    for (int i = n - 1; i >= 1; i--) {
-        stree[i] = min(stree[i << 1], stree[i << 1 | 1]);
-    }
+    SegTree stree(x);
 
     while (q--) {
         int t;
@@ -53,12 +70,12 @@ void solve() {
             int k, u;
             cin >> k >> u;
             k--;
-            update(k, u);
+            stree.update(k, u);
         } else {
             int a, b;
             cin >> a >> b;
             a--, b--;
-            cout << query(1, 0, n - 1, a, b) << "\n";
+            cout << stree.query(a, b) << "\n";
         }
     }
 }
