@@ -13,55 +13,74 @@ typedef vector<ll> vll;
 #define rall(x) (x).rbegin(), (x).rend()
 #define LSOne(S) ((S) & -(S))
 
-struct node {
-    ll sum, pre, suf, mx;
-    node(ll x = 0) : sum(x) {
-        x = max(x, 0ll);
-        pre = x, suf = x, mx = x;
+struct SegTree {
+    struct node {
+        ll sum, pre, suf, mx;
+        node(ll x = 0) : sum(x) {
+            x = max(x, 0ll);
+            pre = x, suf = x, mx = x;
+        }
+    };
+
+    vector<node> tree;
+    int n;
+
+    SegTree(const vi &x) {
+        n = x.size();
+        while (__builtin_popcount(n) != 1) n++;
+        tree.resize(2 * n);
+
+        for (int i = 0; i < x.size(); i++) {
+            tree[n + i] = node(x[i]);
+        }
+        for (int i = n - 1; i >= 1; i--) {
+            tree[i] = merge(tree[i << 1], tree[i << 1 | 1]);
+        }
     }
+
+    node merge(node a, node b) {
+        node res;
+        res.sum = a.sum + b.sum;
+        res.pre = max(a.sum + b.pre, a.pre);
+        res.suf = max(b.suf, a.suf + b.sum);
+        res.mx = max({a.suf + b.pre, a.mx, b.mx});
+        return res;
+    }
+
+    node query(int p, int l, int r, int i, int j) {
+        if (i <= l && r <= j) {
+            return tree[p];
+        }
+        if (r < i || l > j) return 0;
+        int m = l + r >> 1;
+        return merge(query(p << 1, l, m, i, j), query(p << 1 | 1, m + 1, r, i, j));
+    }
+
+    void update(int p, int x) {
+        tree[n + p] = x;
+        for (int j = n + p >> 1; j >= 1; j >>= 1) {
+            tree[j] = merge(tree[j << 1], tree[j << 1 | 1]);
+        }
+    }
+    node query(int i, int j) { return query(1, 0, n - 1, i, j); }
 };
 
-int n, q;
-vector<node> stree;
-
-node merge(node a, node b) {
-    node res;
-    res.sum = a.sum + b.sum;
-    res.pre = max(a.sum + b.pre, a.pre);
-    res.suf = max(b.suf, a.suf + b.sum);
-    res.mx = max({a.suf + b.pre, a.mx, b.mx});
-    return res;
-}
-
-void update(int p, int x) {
-    stree[n + p] = x;
-    for (int j = n + p >> 1; j >= 1; j >>= 1) {
-        stree[j] = merge(stree[j << 1], stree[j << 1 | 1]);
-    }
-}
-
 void solve() {
+    int n, q;
     cin >> n >> q;
     vi a(n);
     for (int i = 0; i < n; i++) {
         cin >> a[i];
     }
-    while (__builtin_popcount(n) != 1) {
-        n++;
-    }
-    stree.resize(2 * n);
-    for (int i = 0; i < a.size(); i++) {
-        stree[n + i] = node(a[i]);
-    }
-    for (int i = n - 1; i >= 1; i--) {
-        stree[i] = merge(stree[i << 1], stree[i << 1 | 1]);
-    }
+
+    SegTree st(a);
+
     while (q--) {
         int k, u;
         cin >> k >> u;
         k--;
-        update(k, u);
-        cout << stree[1].mx << "\n";
+        st.update(k, u);
+        cout << st.tree[1].mx << "\n";
     }
 }
 
