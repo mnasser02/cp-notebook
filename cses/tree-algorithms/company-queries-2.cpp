@@ -30,7 +30,7 @@ void dfs(int u) {
 int lca(int u, int v) {
     if (d[u] < d[v]) swap(u, v);
     int k = d[u] - d[v];
-    for (int j = LOG - 1; j >= 0; j--) {
+    for (int j = 0; j < LOG; j++) {
         if ((1 << j) & k) {
             u = up[u][j];
         }

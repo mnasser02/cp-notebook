@@ -13,11 +13,33 @@ typedef vector<ll> vll;
 #define rall(x) (x).rbegin(), (x).rend()
 #define LSOne(S) ((S) & -(S))
 
+struct SegTree {
+    vll tree, lazy;
+    int n;
+    SegTree(int _n) : n(_n) {
+        while (__builtin_popcount(n) != 1) n++;
+        tree.resize(2 * n);
+    }
+    ll query(int p, int l, int r, int i, int j) {
+        if (i <= l && r <= j) {
+            return tree[p];
+        }
+        if (r < i || l > j) return 0;
+        int m = l + r >> 1;
+        return query(p << 1, l, m, i, j) + query(p << 1 | 1, m + 1, r, i, j);
+    }
+    void update(int p, int x) {
+        tree[n + p] = x;
+        for (int j = n + p >> 1; j >= 1; j >>= 1) {
+            tree[j] = tree[j << 1] + tree[j << 1 | 1];
+        }
+    }
+    ll query(int i, int j) { return query(1, 0, n - 1, i, j); }
+};
+
 const int N = 1 << 18;
 vi AL[N];
 int in[N], out[N], a[N];
-ll stree[2 * N];
-
 int timer;
 
 void dfs(int u, int p) {
@@ -29,30 +51,13 @@ void dfs(int u, int p) {
     out[u] = timer;
 }
 
-ll query(int p, int l, int r, int i, int j) {
-    if (i <= l && r <= j) {
-        return stree[p];
-    }
-    if (r < i || l > j) {
-        return 0;
-    }
-    int m = l + r >> 1;
-    return query(p << 1, l, m, i, j) + query(p << 1 | 1, m + 1, r, i, j);
-}
-
-void update(int p, int x) {
-    stree[N + p] = x;
-    for (int j = N + p >> 1; j >= 1; j >>= 1) {
-        stree[j] = stree[j << 1] + stree[j << 1 | 1];
-    }
-}
-
 void solve() {
     int n, q;
     cin >> n >> q;
     for (int i = 0; i < n; i++) {
         cin >> a[i];
     }
+    SegTree st(n);
     for (int i = 0; i < n - 1; i++) {
         int u, v;
         cin >> u >> v;
@@ -61,9 +66,10 @@ void solve() {
         AL[v].push_back(u);
     }
 
+    timer = -1;
     dfs(0, -1);
     for (int i = 0; i < n; i++) {
-        update(in[i], a[i]);
+        st.update(in[i], a[i]);
     }
 
     while (q--) {
@@ -73,12 +79,12 @@ void solve() {
             int i, x;
             cin >> i >> x;
             i--;
-            update(in[i], x);
+            st.update(in[i], x);
         } else {
             int i;
             cin >> i;
             i--;
-            cout << query(1, 0, N - 1, in[i], out[i]) << "\n";
+            cout << st.query(in[i], out[i]) << "\n";
         }
     }
 }
