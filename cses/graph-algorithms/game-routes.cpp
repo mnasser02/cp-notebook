@@ -27,63 +27,41 @@ bool ckmin(T& a, const T& b) { return b < a ? a = b, 1 : 0; }
 template <class T>
 bool ckmax(T& a, const T& b) { return a < b ? a = b, 1 : 0; }
 
+const int M = 1e9 + 7;
 void solve() {
     int n, m;
     cin >> n >> m;
-    vector<vii> AL(n);
-    vector<vi> ALr(n);
+    vector<vi> AL(n);
+    vi indeg(n);
     for (int i = 0; i < m; i++) {
-        int u, v, w;
-        cin >> u >> v >> w;
+        int u, v;
+        cin >> u >> v;
         u--, v--;
-        AL[u].push_back({v, -w});
-        ALr[v].push_back(u);
+        AL[u].push_back(v);
+        indeg[v]++;
     }
 
     queue<int> q;
-    vll dist(n, 1e18);
-    vi freq(n, 0);
-    vector<bool> in_queue(n), cycle(n);
-
-    q.push(0);
-    dist[0] = 0;
-    in_queue[0] = 1;
-
+    vi dp(n);
+    vi par(n, -1);
+    for (int u = 0; u < n; u++) {
+        if (!indeg[u]) {
+            dp[u] = 0;
+            q.push(u);
+        }
+    }
+    dp[0] = 1;
     while (!q.empty()) {
         int u = q.front();
         q.pop();
-        in_queue[u] = 0;
-        for (auto& [v, w] : AL[u]) {
-            if (dist[u] + w >= dist[v]) continue;
-            dist[v] = dist[u] + w;
-            freq[v]++;
-            if (freq[v] > n) {
-                cycle[v] = 1;
-            } else if (!in_queue[v]) {
-                q.push(v);
-                in_queue[v] = 1;
-            }
+        for (int v : AL[u]) {
+            indeg[v]--;
+            dp[v] = (dp[v] + dp[u]) % M;
+            if (!indeg[v]) q.push(v);
         }
     }
 
-    vi vis(n);
-    bool inf = 0;
-    auto dfs = [&](auto self, int u) {
-        vis[u] = 1;
-        if (cycle[u]) {
-            inf = 1;
-            return;
-        }
-        for (int v : ALr[u]) {
-            if (!vis[v]) self(self, v);
-        }
-    };
-    dfs(dfs, n - 1);
-
-    if (inf)
-        cout << "-1";
-    else
-        cout << -dist[n - 1];
+    cout << dp[n - 1] << "\n";
 }
 
 int main() {

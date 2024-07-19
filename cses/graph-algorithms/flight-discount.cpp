@@ -27,63 +27,40 @@ bool ckmin(T& a, const T& b) { return b < a ? a = b, 1 : 0; }
 template <class T>
 bool ckmax(T& a, const T& b) { return a < b ? a = b, 1 : 0; }
 
+using al3 = array<ll, 3>;
 void solve() {
     int n, m;
     cin >> n >> m;
     vector<vii> AL(n);
-    vector<vi> ALr(n);
     for (int i = 0; i < m; i++) {
         int u, v, w;
         cin >> u >> v >> w;
         u--, v--;
-        AL[u].push_back({v, -w});
-        ALr[v].push_back(u);
+        AL[u].push_back({v, w});
     }
-
-    queue<int> q;
-    vll dist(n, 1e18);
-    vi freq(n, 0);
-    vector<bool> in_queue(n), cycle(n);
-
-    q.push(0);
-    dist[0] = 0;
-    in_queue[0] = 1;
-
-    while (!q.empty()) {
-        int u = q.front();
-        q.pop();
-        in_queue[u] = 0;
-        for (auto& [v, w] : AL[u]) {
-            if (dist[u] + w >= dist[v]) continue;
-            dist[v] = dist[u] + w;
-            freq[v]++;
-            if (freq[v] > n) {
-                cycle[v] = 1;
-            } else if (!in_queue[v]) {
-                q.push(v);
-                in_queue[v] = 1;
+    vector<vll> dist(n, vll(2, 1e18));
+    priority_queue<al3, vector<al3>, greater<al3>> pq;
+    pq.push({0, 0, 0});
+    dist[0][0] = 0;
+    while (!pq.empty()) {
+        auto [d, u, b] = pq.top();
+        pq.pop();
+        if (d > dist[u][b]) continue;
+        if (u == n - 1) break;
+        for (auto [v, w] : AL[u]) {
+            if (dist[u][b] + w < dist[v][b]) {
+                dist[v][b] = dist[u][b] + w;
+                pq.push({dist[v][b], v, b});
+            }
+            if (b == 0) {
+                if (dist[u][0] + w / 2 < dist[v][1]) {
+                    dist[v][1] = dist[u][0] + w / 2;
+                    pq.push({dist[v][1], v, 1});
+                }
             }
         }
     }
-
-    vi vis(n);
-    bool inf = 0;
-    auto dfs = [&](auto self, int u) {
-        vis[u] = 1;
-        if (cycle[u]) {
-            inf = 1;
-            return;
-        }
-        for (int v : ALr[u]) {
-            if (!vis[v]) self(self, v);
-        }
-    };
-    dfs(dfs, n - 1);
-
-    if (inf)
-        cout << "-1";
-    else
-        cout << -dist[n - 1];
+    cout << min(dist[n - 1][0], dist[n - 1][1]) << "\n";
 }
 
 int main() {
