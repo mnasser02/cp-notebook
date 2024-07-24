@@ -19,125 +19,122 @@ typedef tree<int, null_type, less<int>, rb_tree_tag, tree_order_statistics_node_
 #define rall(x) (x).rbegin(), (x).rend()
 #define LSOne(S) ((S) & -(S))
 
-struct Node {
-    int x;
-    Node *l = 0;
-    Node *r = 0;
-    Node *p = 0;
-    bool rev = false;
+struct DSU {
+    struct save {
+        int x, y, hx, hy;
+    };
 
-    Node() = default;
+    vi h, p;
+    int cc;
+    stack<save> history;
 
-    Node(int v) { x = v; }
+    DSU(int n) : h(n), p(n), cc(n) {
+        iota(all(p), 0);
+    }
 
-    void push() {
-        if (rev) {
-            rev = false;
-            swap(l, r);
-            if (l) l->rev ^= true;
-            if (r) r->rev ^= true;
+    int find(int x) { return x == p[x] ? x : find(p[x]); }
+
+    bool join(int x, int y) {
+        int px = find(x), py = find(y);
+        if (px == py) {
+            return false;
+        } else {
+            if (h[px] < h[py]) swap(px, py);
+
+            history.push({px, py, h[px], h[py]});
+
+            if (h[px] == h[py]) h[px]++;
+            cc--;
+            p[py] = px;
+
+            return true;
         }
     }
 
-    bool is_root() { return p == 0 || (p->l != this && this != p->r); }
+    void rollback() {
+        auto [x, y, hx, hy] = history.top();
+        history.pop();
+        p[x] = x, p[y] = y, h[x] = hx, h[y] = hy;
+        cc++;
+    }
 };
 
-struct LCT {
-    vector<Node> a;
+struct query {
+    int u, v;
+    bool joined = 0;
+    query(int u_, int v_) : u(u_), v(v_) {}
+};
 
-    LCT(int n) {
-        a.resize(n + 1);
-        for (int i = 1; i <= n; ++i) a[i].x = i;
+struct QueryTree {
+    DSU dsu;
+    vector<vector<query>> tree;
+    vi ans;
+
+    QueryTree(int n, int q) : dsu(n), tree(4 * q + 5), ans(q) {}
+
+    void insert(int p, int l, int r, int i, int j, query qr) {
+        if (i <= l && r <= j) {
+            tree[p].push_back(qr);
+            return;
+        }
+        if (l > j || r < i) return;
+        int m = l + r >> 1;
+        insert(p << 1, l, m, i, j, qr);
+        insert(p << 1 | 1, m + 1, r, i, j, qr);
     }
 
-    void rot(Node *c) {
-        auto p = c->p;
-        auto g = p->p;
-
-        if (!p->is_root()) (g->r == p ? g->r : g->l) = c;
-
-        p->push();
-        c->push();
-
-        if (p->l == c) {  // rtr
-            p->l = c->r;
-            c->r = p;
-            if (p->l) p->l->p = p;
-        } else {  // rtl
-            p->r = c->l;
-            c->l = p;
-            if (p->r) p->r->p = p;
+    void dfs(int p, int l, int r) {
+        for (query& qr : tree[p]) {
+            qr.joined = dsu.join(qr.u, qr.v);
         }
 
-        p->p = c;
-        c->p = g;
-    }
-
-    void splay(Node *c) {
-        while (!c->is_root()) {
-            auto p = c->p;
-            auto g = p->p;
-            if (!p->is_root()) rot((g->r == p) == (p->r == c) ? p : c);
-            rot(c);
+        if (l == r) {
+            ans[l] = dsu.cc;
+        } else {
+            int m = l + r >> 1;
+            dfs(p << 1, l, m);
+            dfs(p << 1 | 1, m + 1, r);
         }
-        c->push();
-    }
-
-    Node *access(int v) {
-        Node *last = 0;
-        Node *c = &a[v];
-        for (Node *p = c; p; p = p->p) {
-            splay(p);
-            p->r = last;
-            last = p;
+        for (query qr : tree[p]) {
+            if (qr.joined) dsu.rollback();
         }
-        splay(c);
-        return last;
-    }
-
-    void make_root(int v) {
-        access(v);
-        auto *c = &a[v];
-        if (c->l) c->l->rev ^= true, c->l = 0;
-    }
-
-    void link(int u, int v) {
-        make_root(v);
-        Node *c = &a[v];
-        c->p = &a[u];
-    }
-
-    void cut(int u, int v) {
-        make_root(u);
-        access(v);
-        if (a[v].l) {
-            a[v].l->p = 0;
-            a[v].l = 0;
-        }
-    }
-
-    bool connected(int u, int v) {
-        access(u);
-        access(v);
-        return a[u].p;
     }
 };
 
 void solve() {
-    int n, m, k;
-    cin >> n >> m >> k;
+    int n, m, q;
+    cin >> n >> m >> q;
 
-    LCT lc(n);
+    map<ii, int> mp;
+    for (int i = 0; i < m; i++) {
+        int u, v;
+        cin >> u >> v;
+        u--, v--;
+        if (u > v) swap(u, v);
+        mp[{u, v}] = 0;
+    }
 
-    while (k--) {
+    QueryTree qt(n, q + 1);
+    for (int i = 1; i <= q; i++) {
         int t, u, v;
         cin >> t >> u >> v;
+        u--, v--;
+        if (u > v) swap(u, v);
+
         if (t == 1) {
-            lc.link(u, v);
+            mp[{u, v}] = i;
         } else {
-            lc.cut(u, v);
+            qt.insert(1, 0, q, mp[{u, v}], i - 1, query(u, v));
+            mp.erase({u, v});
         }
     }
+
+    for (auto [qr, i] : mp) {
+        qt.insert(1, 0, q, i, q, query(qr.first, qr.second));
+    }
+
+    qt.dfs(1, 0, q);
+    for (int x : qt.ans) cout << x << " ";
 }
 
 int main() {
