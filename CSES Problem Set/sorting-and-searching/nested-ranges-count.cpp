@@ -31,34 +31,35 @@ void solve() {
     int n;
     cin >> n;
     vector<array<int, 3>> A(n);
-    ordered_set<ii> st, st2;
+    ordered_set<ii> st;
+
     for (int i = 0; i < n; i++) {
         cin >> A[i][0] >> A[i][1];
-        st.insert({A[i][1], i});
         A[i][2] = i;
     }
-    st2 = st;
     sort(all(A), [](array<int, 3>& a, array<int, 3>& b) {
-        if (a[0] == b[0]) return a[1] > b[1];
-        return a[0] < b[0];
+        if (a[0] == b[0]) return a[1] < b[1];
+        return a[0] > b[0];
     });
 
-    vi s1(n), s2(n);
+    vi ans1(n), ans2(n);
+
     for (auto [l, r, i] : A) {
-        st.erase({r, i});
-        s1[i] += st.order_of_key({r, 1e9});
+        ans1[i] += st.order_of_key({r, 1e9});
+        st.insert({r, i});
     }
 
-    swap(st2, st);
+    st.clear();
     reverse(all(A));
+
     for (auto [l, r, i] : A) {
-        st.erase({r, i});
-        s2[i] += (int)st.size() - st.order_of_key({r, -1});
+        ans2[i] += (int)st.size() - st.order_of_key({r, -1});
+        st.insert({r, i});
     }
 
-    for (int x : s1) cout << x << " ";
+    for (int x : ans1) cout << x << " ";
     cout << "\n";
-    for (int x : s2) cout << x << " ";
+    for (int x : ans2) cout << x << " ";
 }
 
 int main() {

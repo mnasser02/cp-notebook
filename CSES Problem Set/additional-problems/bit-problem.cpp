@@ -27,45 +27,30 @@ bool ckmin(T& a, const T& b) { return b < a ? a = b, 1 : 0; }
 template <class T>
 bool ckmax(T& a, const T& b) { return a < b ? a = b, 1 : 0; }
 
+const int N = 1 << 20;
 void solve() {
-    int n, m;
-    cin >> n >> m;
-    vector<vii> AL(n);
-    vi deg(n);
-    for (int i = 0; i < m; i++) {
-        int u, v;
-        cin >> u >> v;
-        u--, v--;
-        AL[u].push_back({v, i});
-        AL[v].push_back({u, i});
-        deg[v]++, deg[u]++;
+    int n;
+    cin >> n;
+
+    vi dp1(N), dp2(N), x(n);
+    for (int i = 0; i < n; i++) {
+        cin >> x[i];
+        dp1[x[i]]++;
+        dp2[x[i]]++;
     }
-    for (int u = 0; u < n; u++) {
-        if (deg[u] & 1) {
-            cout << "IMPOSSIBLE\n";
-            return;
+    for (int i = 0; i < 20; i++) {
+        for (int bm = 0; bm < N; bm++) {
+            if (bm & (1 << i)) dp1[bm] += dp1[bm ^ (1 << i)];
         }
     }
-    vi ans, done(m);
-
-    auto dfs = [&](auto self, int u) -> void {
-        while (!AL[u].empty()) {
-            auto [v, i] = AL[u].back();
-            AL[u].pop_back();
-            if (done[i]) {
-                continue;
-            }
-            done[i] = true;
-            self(self, v);
+    for (int i = 0; i < 20; i++) {
+        for (int bm = N - 1; bm >= 0; bm--) {
+            if (!(bm & (1 << i))) dp2[bm] += dp2[bm ^ (1 << i)];
         }
-        ans.push_back(u);
-    };
-    dfs(dfs, 0);
-
-    if (ans.size() < m) {
-        cout << "IMPOSSIBLE\n";
-    } else {
-        for (int x : ans) cout << x + 1 << " ";
+    }
+    for (int i = 0; i < n; i++) {
+        cout << dp1[x[i]] << ' ' << dp2[x[i]] << ' ' << (n - dp1[((1 << 20) - 1) ^ x[i]]);
+        cout << '\n';
     }
 }
 

@@ -31,7 +31,6 @@ struct SuffixAuto {
     int n;
     vector<state> st;
     int sz, last;
-    vi endpos_size;
 
     SuffixAuto(const string& S) {
         n = S.size();
@@ -42,19 +41,9 @@ struct SuffixAuto {
         last = 0;
         sz = 1;
 
-        endpos_size.resize(2 * n);
         for (char c : S) {
             extend(c);
         }
-
-        vector<pair<int, int>> v(2 * n);
-        for (int i = 0; i < v.size(); i++)
-            v[i] = {st[i].len, i};
-        sort(v.rbegin(), v.rend());
-        for (auto [len, id] : v)
-            if (st[id].link != -1)
-                endpos_size[st[id].link] += endpos_size[id];
-        endpos_size[0] = 1;
     }
 
     void extend(char _c) {
@@ -63,8 +52,6 @@ struct SuffixAuto {
         int cur = sz++;
         st[cur].len = st[last].len + 1;
         int p = last;
-
-        endpos_size[cur] = 1;
 
         while (p != -1 && st[p].next[c] == -1) {
             st[p].next[c] = cur;
@@ -81,8 +68,6 @@ struct SuffixAuto {
                 st[clone].len = st[p].len + 1;
                 st[clone].next = st[q].next;
                 st[clone].link = st[q].link;
-                endpos_size[clone] = 0;
-
                 while (p != -1 && st[p].next[c] == q) {
                     st[p].next[c] = clone;
                     p = st[p].link;
@@ -102,12 +87,12 @@ struct SuffixAuto {
             if (v != -1)
                 dp[u] += dfs_dp(v);
         }
-        return dp[u] += endpos_size[u];
+        return ++dp[u];
     }
     void dfs(int u, ll& k, string& s) {
-        if (k < endpos_size[u])  // empty string starting from u
+        if (k == 0)  // empty string starting from u
             return;
-        k -= endpos_size[u];  // remove empty string
+        k--;  // remove empty string
         for (int c = 0; c < K; c++) {
             int v = st[u].next[c];
             if (v == -1) continue;
@@ -120,7 +105,7 @@ struct SuffixAuto {
             }
         }
     }
-    string kth_substring(ll k) {
+    string kth_distinct_substring(ll k) {
         dp.resize(2 * n);
         string s;
         dfs_dp(0);
@@ -135,7 +120,7 @@ void solve() {
     cin >> T >> k;
 
     SuffixAuto sa(T);
-    cout << sa.kth_substring(k);
+    cout << sa.kth_distinct_substring(k);
 }
 
 int main() {

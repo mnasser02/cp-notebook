@@ -27,45 +27,61 @@ bool ckmin(T& a, const T& b) { return b < a ? a = b, 1 : 0; }
 template <class T>
 bool ckmax(T& a, const T& b) { return a < b ? a = b, 1 : 0; }
 
+struct DSU {
+    vi p, h, sz;
+    DSU(int n) {
+        h.assign(n, 0);
+        sz.assign(n, 1);
+        p.resize(n);
+        iota(all(p), 0);
+    }
+    int find(int x) {
+        if (p[x] != x)
+            p[x] = find(p[x]);
+        return p[x];
+    }
+    bool join(int x, int y) {
+        int px = find(x), py = find(y);
+        if (px == py)
+            return false;
+        if (h[px] < h[py]) {
+            sz[py] += sz[px];
+            p[px] = py;
+        } else {
+            sz[px] += sz[py];
+            p[py] = px;
+            if (h[px] == h[py])
+                h[px]++;
+        }
+        return true;
+    }
+};
+
 void solve() {
     int n, m;
     cin >> n >> m;
-    vector<vii> AL(n);
-    vi deg(n);
+    DSU dsu(n);
     for (int i = 0; i < m; i++) {
         int u, v;
         cin >> u >> v;
         u--, v--;
-        AL[u].push_back({v, i});
-        AL[v].push_back({u, i});
-        deg[v]++, deg[u]++;
+        dsu.join(u, v);
     }
+    vi w;
     for (int u = 0; u < n; u++) {
-        if (deg[u] & 1) {
-            cout << "IMPOSSIBLE\n";
-            return;
+        if (u == dsu.find(u)) {
+            w.push_back(dsu.sz[u]);
         }
     }
-    vi ans, done(m);
 
-    auto dfs = [&](auto self, int u) -> void {
-        while (!AL[u].empty()) {
-            auto [v, i] = AL[u].back();
-            AL[u].pop_back();
-            if (done[i]) {
-                continue;
-            }
-            done[i] = true;
-            self(self, v);
-        }
-        ans.push_back(u);
-    };
-    dfs(dfs, 0);
+    bitset<(int)1e5 + 1> bs;
 
-    if (ans.size() < m) {
-        cout << "IMPOSSIBLE\n";
-    } else {
-        for (int x : ans) cout << x + 1 << " ";
+    bs[0] = 1;
+    for (int i = 0; i < w.size(); i++) {
+        bs |= bs << w[i];
+    }
+    for (int u = 1; u <= n; u++) {
+        cout << bs[u];
     }
 }
 
