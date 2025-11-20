@@ -1,164 +1,341 @@
-typedef struct snode* sn;
-struct snode {
-    sn p, c[2];     // parent, children
-    sn extra;       // extra cycle node for "The Applicant"
-    bool flip = 0;  // subtree flipped or not
-    int sz;
-    ll val, sum;       // value in node, # nodes in current splay tree
-    ll sub, vsub = 0;  // vsub stores sum of virtual children
+#include <bits/stdc++.h>
+using namespace std;
 
-    snode(int _val) : val(_val) {
-        p = c[0] = c[1] = extra = NULL;
-        calc();
-    }
+/**
+ * Description: The ultimate link cut tree supporting all path/subtree lazy updates and aggregates. Nodes are 1-indexed.
+ * Note that lazy style is different from my usual style, lazy on node means value is already updated instead of pending update.
+ * Only modifications required are: 1. Data struct, 2. Set MAX to 2n, 3. Populate freeList with n nodes at the start.
+ * Source: https://github.com/mzhang2021/cp-library/blob/master/implementations/graphs/TopTree.h
+ * Verification: https://dmoj.ca/problem/ds5
+ * Time: O(log n)
+ */
 
-    friend int getSz(sn x) { return x ? x->sz : 0; }
-    friend ll getSub(sn x) { return x ? x->sub : 0; }
-    friend ll getSum(sn x) { return x ? x->sum : 0; }
+const int MAX = 2e5 + 5;
 
-    void prop() {  // lazy prop
-        if (!flip) return;
-        swap(c[0], c[1]);
-        flip = 0;
-        for (int i = 0; i < 2; i++)
-            if (c[i]) c[i]->flip ^= 1;
-    }
-    void calc() {  // recalc vals
-        for (int i = 0; i < 2; i++)
-            if (c[i]) c[i]->prop();
-        sz = 1 + getSz(c[0]) + getSz(c[1]);
-        sub = val + getSub(c[0]) + getSub(c[1]) + vsub;
-        sum = val + getSum(c[0]) + getSum(c[1]);
-    }
+struct Data {
+    int sum, mn, mx, sz;
 
-    //////// SPLAY TREE OPERATIONS
-    int dir() {
-        if (!p) return -2;
-        for (int i = 0; i < 2; i++)
-            if (p->c[i] == this) return i;
-        return -1;  // p is path-parent pointer
-    }  // -> not in current splay tree
-    // test if root of current splay tree
-    bool isRoot() { return dir() < 0; }
-    friend void setLink(sn x, sn y, int d) {
-        if (y) y->p = x;
-        if (d >= 0) x->c[d] = y;
-    }
-    void rot() {  // assume p and p->p propagated
-        assert(!isRoot());
-        int x = dir();
-        sn pa = p;
-        setLink(pa->p, this, pa->dir());
-        setLink(pa, c[x ^ 1], x);
-        setLink(this, pa, x ^ 1);
-        pa->calc();
-    }
-    void splay() {
-        while (!isRoot() && !p->isRoot()) {
-            p->p->prop(), p->prop(), prop();
-            dir() == p->dir() ? p->rot() : rot();
-            rot();
-        }
-        if (!isRoot()) p->prop(), prop(), rot();
-        prop();
-        calc();
-    }
-    sn fbo(int b) {  // find by order
-        prop();
-        int z = getSz(c[0]);  // of splay tree
-        if (b == z) {
-            splay();
-            return this;
-        }
-        return b < z ? c[0]->fbo(b) : c[1]->fbo(b - z - 1);
-    }
+    Data() : sum(0), mn(INT_MAX), mx(INT_MIN), sz(0) {}
 
-    //////// BASE OPERATIONS
-    void access() {  // bring this to top of tree, propagate
-        for (sn v = this, pre = NULL; v; v = v->p) {
-            v->splay();  // now switch virtual children
-            if (pre) v->vsub -= pre->sub;
-            if (v->c[1]) v->vsub += v->c[1]->sub;
-            v->c[1] = pre;
-            v->calc();
-            pre = v;
-        }
-        splay();
-        assert(!c[1]);  // right subtree is empty
-    }
-    void makeRoot() {
-        access();
-        flip ^= 1;
-        access();
-        assert(!c[0] && !c[1]);
-    }
+    Data(int val) : sum(val), mn(val), mx(val), sz(1) {}
 
-    //////// QUERIES
-    friend sn lca(sn x, sn y) {
-        if (x == y) return x;
-        x->access(), y->access();
-        if (!x->p) return NULL;
-        x->splay();
-        return x->p ?: x;  // y was below x in latter case
-    }  // access at y did not affect x -> not connected
-    friend bool connected(sn x, sn y) { return lca(x, y); }
-    // # nodes above
-    int distRoot() {
-        access();
-        return getSz(c[0]);
-    }
-    sn getRoot() {  // get root of LCT component
-        access();
-        sn a = this;
-        while (a->c[0]) a = a->c[0], a->prop();
-        a->access();
-        return a;
-    }
-    sn getPar(int b) {  // get b-th parent on path to root
-        access();
-        b = getSz(c[0]) - b;
-        assert(b >= 0);
-        return fbo(b);
-    }  // can also get min, max on path to root, etc
-    ll query() {
-        access();
-        return sum;
-    }
-    ll sub_query(sn p) {
-        p->makeRoot();
-        access();
-        return vsub + val;
-    }
+    Data(int _sum, int _mn, int _mx, int _sz) : sum(_sum), mn(_mn), mx(_mx), sz(_sz) {}
+};
 
-    //////// MODIFICATIONS
-    void add(int v) {
-        access();
-        val += v;
-        calc();
-    }
-    friend void link(sn x, sn y, bool force = 0) {
-        assert(!connected(x, y));
-        if (force)
-            y->makeRoot();  // make x par of y
-        else {
-            y->access();
-            assert(!y->c[0]);
-        }
-        x->access();
-        setLink(y, x, 0);
-        y->calc();
-    }
-    friend void cut(sn y) {  // cut y from its parent
-        y->access();
-        assert(y->c[0]);
-        y->c[0]->p = NULL;
-        y->c[0] = NULL;
-        y->calc();
-    }
-    friend void cut(sn x, sn y) {  // if x, y adj in tree
-        x->makeRoot();
-        y->access();
-        assert(y->c[0] == x && !x->c[0] && !x->c[1]);
-        cut(y);
+struct Lazy {
+    int a, b;
+
+    Lazy(int _a = 1, int _b = 0) : a(_a), b(_b) {}
+
+    bool lazy() {
+        return a != 1 || b != 0;
     }
 };
+
+Data operator+(const Data& a, const Data& b) {
+    return Data(a.sum + b.sum, min(a.mn, b.mn), max(a.mx, b.mx), a.sz + b.sz);
+}
+
+Data& operator+=(Data& a, const Data& b) {
+    return a = a + b;
+}
+
+Lazy& operator+=(Lazy& a, const Lazy& b) {
+    return a = Lazy(a.a * b.a, a.b * b.a + b.b);
+}
+
+int& operator+=(int& a, const Lazy& b) {
+    return a = a * b.a + b.b;
+}
+
+Data& operator+=(Data& a, const Lazy& b) {
+    return a.sz ? a = Data(a.sum * b.a + a.sz * b.b, a.mn * b.a + b.b, a.mx * b.a + b.b, a.sz) : a;
+}
+
+struct Node {
+    int p, ch[4], val;
+    Data path, sub, all;
+    Lazy plazy, slazy;
+    bool flip, fake;
+
+    Node() : p(0), ch(), path(), sub(), all(), plazy(), slazy(), flip(false), fake(true) {}
+
+    Node(int _val) : Node() {
+        val = _val;
+        path = all = Data(val);
+        fake = false;
+    }
+} tr[MAX];
+vector<int> freeList;
+
+void pushFlip(int u) {
+    if (!u)
+        return;
+    swap(tr[u].ch[0], tr[u].ch[1]);
+    tr[u].flip ^= true;
+}
+
+void pushPath(int u, const Lazy& lazy) {
+    if (!u || tr[u].fake)
+        return;
+    tr[u].val += lazy;
+    tr[u].path += lazy;
+    tr[u].all = tr[u].path + tr[u].sub;
+    tr[u].plazy += lazy;
+}
+
+void pushSub(int u, bool o, const Lazy& lazy) {
+    if (!u)
+        return;
+    tr[u].sub += lazy;
+    tr[u].slazy += lazy;
+    if (!tr[u].fake && o)
+        pushPath(u, lazy);
+    else
+        tr[u].all = tr[u].path + tr[u].sub;
+}
+
+void push(int u) {
+    if (!u)
+        return;
+    if (tr[u].flip) {
+        pushFlip(tr[u].ch[0]);
+        pushFlip(tr[u].ch[1]);
+        tr[u].flip = false;
+    }
+    if (tr[u].plazy.lazy()) {
+        pushPath(tr[u].ch[0], tr[u].plazy);
+        pushPath(tr[u].ch[1], tr[u].plazy);
+        tr[u].plazy = Lazy();
+    }
+    if (tr[u].slazy.lazy()) {
+        pushSub(tr[u].ch[0], false, tr[u].slazy);
+        pushSub(tr[u].ch[1], false, tr[u].slazy);
+        pushSub(tr[u].ch[2], true, tr[u].slazy);
+        pushSub(tr[u].ch[3], true, tr[u].slazy);
+        tr[u].slazy = Lazy();
+    }
+}
+
+void pull(int u) {
+    if (!tr[u].fake)
+        tr[u].path = tr[tr[u].ch[0]].path + tr[tr[u].ch[1]].path + tr[u].val;
+    tr[u].sub = tr[tr[u].ch[0]].sub + tr[tr[u].ch[1]].sub + tr[tr[u].ch[2]].all + tr[tr[u].ch[3]].all;
+    tr[u].all = tr[u].path + tr[u].sub;
+}
+
+void attach(int u, int d, int v) {
+    tr[u].ch[d] = v;
+    tr[v].p = u;
+    pull(u);
+}
+
+int dir(int u, int o) {
+    int v = tr[u].p;
+    return tr[v].ch[o] == u ? o : tr[v].ch[o + 1] == u ? o + 1
+                                                       : -1;
+}
+
+void rotate(int u, int o) {
+    int v = tr[u].p, w = tr[v].p, du = dir(u, o), dv = dir(v, o);
+    if (dv == -1 && o == 0)
+        dv = dir(v, 2);
+    attach(v, du, tr[u].ch[du ^ 1]);
+    attach(u, du ^ 1, v);
+    if (~dv)
+        attach(w, dv, u);
+    else
+        tr[u].p = w;
+}
+
+void splay(int u, int o) {
+    push(u);
+    while (~dir(u, o) && (o == 0 || tr[tr[u].p].fake)) {
+        int v = tr[u].p, w = tr[v].p;
+        push(w);
+        push(v);
+        push(u);
+        int du = dir(u, o), dv = dir(v, o);
+        if (~dv && (o == 0 || tr[w].fake))
+            rotate(du == dv ? v : u, o);
+        rotate(u, o);
+    }
+}
+
+void add(int u, int v) {
+    if (!v)
+        return;
+    for (int i = 2; i < 4; i++)
+        if (!tr[u].ch[i]) {
+            attach(u, i, v);
+            return;
+        }
+    int w = freeList.back();
+    freeList.pop_back();
+    attach(w, 2, tr[u].ch[2]);
+    attach(w, 3, v);
+    attach(u, 2, w);
+}
+
+void recPush(int u) {
+    if (tr[u].fake)
+        recPush(tr[u].p);
+    push(u);
+}
+
+void rem(int u) {
+    int v = tr[u].p;
+    recPush(v);
+    if (tr[v].fake) {
+        int w = tr[v].p;
+        attach(w, dir(v, 2), tr[v].ch[dir(u, 2) ^ 1]);
+        if (tr[w].fake)
+            splay(w, 2);
+        freeList.push_back(v);
+    } else {
+        attach(v, dir(u, 2), 0);
+    }
+    tr[u].p = 0;
+}
+
+int par(int u) {
+    int v = tr[u].p;
+    if (!tr[v].fake)
+        return v;
+    splay(v, 2);
+    return tr[v].p;
+}
+
+int access(int u) {
+    int v = u;
+    splay(u, 0);
+    add(u, tr[u].ch[1]);
+    attach(u, 1, 0);
+    while (tr[u].p) {
+        v = par(u);
+        splay(v, 0);
+        rem(u);
+        add(v, tr[v].ch[1]);
+        attach(v, 1, u);
+        splay(u, 0);
+    }
+    return v;
+}
+
+void reroot(int u) {
+    access(u);
+    pushFlip(u);
+}
+
+void link(int u, int v) {
+    reroot(u);
+    access(v);
+    add(v, u);
+}
+
+void cut(int u, int v) {
+    reroot(u);
+    access(v);
+    tr[v].ch[0] = tr[u].p = 0;
+    pull(v);
+}
+
+/*
+ * K = 0  means subtree modification. K is followed by x and y. This operation sets all vertex weights in the subtree of x to y.
+ * K = 1  means change root. The line contains one additional integer x, representing the new root of the tree.
+ * K = 2  means path modification. K is followed by integers x, y, z. This operation sets z as the vertex weight of all vertices on the path from x to y.
+ * K = 3  means subtree min. K is followed by x, the root of the queried subtree.
+ * K = 4  means subtree max. K is followed by x, the root of the queried subtree.
+ * K = 5  means increment subtree. K is followed by x and y, the root of the queried subtree and the value to increment by.
+ * K = 6  means path increment. K is followed by x, y, z. This operation increments all vertex weights on the path from x to y by z.
+ * K = 7  means path min. K is followed by x and y, the endpoints of the queried path.
+ * K = 8  means path max. K is followed by x and y, the endpoints of the queried path.
+ * K = 9  means change parent. K is followed by x and y. This operation changes the parent of x to y. If y is in the subtree of this operation, do nothing.
+ * K = 10 means path sum. K is followed by x and y, and asks for the sum of the weights on the path from x to y.
+ * K = 11 means subtree sum. K is followed by x, and asks for the sum of the weights in the subtree rooted at x.
+ */
+
+int main() {
+    int n, q;
+    cin >> n >> q;
+    vector<pair<int, int>> edges;
+    for (int i = 0; i < n - 1; i++) {
+        int x, y;
+        cin >> x >> y;
+        edges.emplace_back(x, y);
+    }
+
+    for (int i = 1; i <= n; i++) {
+        int w;
+        cin >> w;
+        tr[i] = Node(w);
+    }
+    for (int i = n + 1; i < MAX; i++)
+        freeList.push_back(i);
+    for (auto [x, y] : edges)
+        link(x, y);
+
+    int rt;
+    cin >> rt;
+    while (q--) {
+        int k;
+        cin >> k;
+        if (k == 1) {  // change root
+            cin >> rt;
+        } else if (k == 3 || k == 4 || k == 11) {  // subtree query
+            int x;
+            cin >> x;
+            reroot(rt);
+            access(x);
+            Data ret = tr[x].val;
+            for (int i = 2; i < 4; i++)
+                ret += tr[tr[x].ch[i]].all;
+            if (k == 3)
+                cout << ret.mn << "\n";
+            else if (k == 4)
+                cout << ret.mx << "\n";
+            else
+                cout << ret.sum << "\n";
+        } else if (k == 0 || k == 5) {  // subtree update
+            int x, y;
+            cin >> x >> y;
+            reroot(rt);
+            access(x);
+            Lazy lazy(k == 5, y);
+            tr[x].val += lazy;
+            for (int i = 2; i < 4; i++)
+                pushSub(tr[x].ch[i], true, lazy);
+        } else if (k == 7 || k == 8 || k == 10) {  // path query
+            int x, y;
+            cin >> x >> y;
+            reroot(x);
+            access(y);
+            Data ret = tr[y].path;
+            if (k == 7)
+                cout << ret.mn << "\n";
+            else if (k == 8)
+                cout << ret.mx << "\n";
+            else
+                cout << ret.sum << "\n";
+        } else if (k == 2 || k == 6) {  // path update
+            int x, y, z;
+            cin >> x >> y >> z;
+            reroot(x);
+            access(y);
+            pushPath(y, Lazy(k == 6, z));
+        } else {  // change parent
+            int x, y;
+            cin >> x >> y;
+            reroot(rt);
+            access(y);
+            if (access(x) != x) {
+                tr[x].ch[0] = tr[tr[x].ch[0]].p = 0;
+                pull(x);
+                access(y);
+                add(y, x);
+            }
+        }
+    }
+
+    return 0;
+}
